@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectBank, parseMoney, parseStatementText, validateBalance } from './parse';
+import { detectBank, extractStatementMetadata, parseMoney, parseStatementText, validateBalance } from './parse';
 
 describe('money parsing', () => {
   it('parses Indonesian and international separators', () => {
@@ -77,6 +77,29 @@ describe('bank detection and transaction parsing', () => {
     expect(rows[4].balance).toBe(471168.46);
     expect(rows[5].confidence).toBe('review');
     expect(validateBalance(1993702.46, rows.slice(1, 5), 471168.46).ok).toBe(true);
+  });
+
+
+  it('extracts bank, account, period and opening/closing balances from statement header and rows', () => {
+    const text = [
+      'REKENING TAHAPAN BANK CENTRAL ASIA',
+      'NO. REKENING : 1951273258',
+      'HALAMAN : 1/2',
+      'PERIODE : AGUSTUS 2025',
+      'MATA UANG : IDR',
+    ].join('\n');
+    const rows = parseStatementText([
+      '01/08 SALDO AWAL 1,993,702.46',
+      '06/08 TRANSFER CR 4,200,026.00 6,193,728.46',
+      '31/08 TRANSFER DB 500,000.00 5,693,728.46',
+    ].join('\n'));
+    expect(extractStatementMetadata(text, rows)).toEqual({
+      bank: 'BCA',
+      account: '1951273258',
+      period: 'Agustus 2025',
+      openingBalance: 1993702.46,
+      closingBalance: 5693728.46,
+    });
   });
 
 });

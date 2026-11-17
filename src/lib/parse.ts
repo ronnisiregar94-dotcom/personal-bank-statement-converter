@@ -121,6 +121,38 @@ export function extractStatementMetadata(text: string, rows: Transaction[] = [])
   };
 }
 
+
+export function calculateRunningBalances(rows: Transaction[], openingInput: string | number | null): Transaction[] {
+  const opening = typeof openingInput === 'number'
+    ? openingInput
+    : openingInput === null || openingInput.trim() === '' ? null : parseMoney(openingInput);
+  let running = opening;
+  return rows.map(row => {
+    const isOpening = /SALDO\s+AWAL|OPENING\s+BALANCE/i.test(row.description);
+    if (isOpening) {
+      if (row.balance !== null) running = row.balance;
+      else if (running !== null) return { ...row, balance: running };
+      return row;
+    }
+    if (row.debit !== null || row.credit !== null) {
+      if (running !== null) {
+        const calculated = running + (row.credit ?? 0) - (row.debit ?? 0);
+        if (row.balance === null) {
+          running = calculated;
+          return { ...row, balance: calculated };
+        }
+        // Keep the statement's printed balance as source evidence; use it as the
+        // starting point for the next row even when it differs from the calculation.
+        running = row.balance;
+        return row;
+      }
+      return row;
+    }
+    if (row.balance !== null) running = row.balance;
+    return row;
+  });
+}
+
 export function validateBalance(opening: number, rows: Transaction[], closing?: number): { calculated: number; closing: number | null; difference: number | null; ok: boolean } {
   const calculated = rows.reduce((value, row) => value + (row.credit ?? 0) - (row.debit ?? 0), opening);
   const actual = closing ?? [...rows].reverse().find(row => row.balance !== null)?.balance ?? null;

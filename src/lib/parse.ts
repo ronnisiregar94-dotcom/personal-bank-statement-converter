@@ -7,7 +7,7 @@ export const BANK_OPTIONS: { value: BankCode; label: string }[] = [
   { value: 'BSI', label: 'Bank Syariah Indonesia' }, { value: 'OTHER', label: 'Lainnya' },
 ];
 const datePrefix = /^(?:\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})\b/i;
-const amountPattern = /(?:\(?-?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{2}|[.]\d{2})?\)?)/g;
+const amountPattern = /(?:\(?-?(?:\d{1,3}(?:[.,]\d{3})+|\d+)[.,]\d{2}\)?)/g;
 
 export function parseMoney(raw: string): number | null {
   let value = raw.replace(/[^\d,.-]/g, '').trim();
@@ -58,13 +58,14 @@ export function parseStatementText(text: string, _bank: BankCode = 'OTHER'): Tra
     const values = tokens.map(parseMoney);
     const isOpening = /\b(SALDO\s+AWAL|OPENING\s+BALANCE)\b/i.test(rest);
     const direction = directionOf(rest);
-    const hasBranch = tokens.length >= 3 && /^\d{4}$/.test(tokens[0]);
-    const branch = hasBranch ? tokens[0] : '';
-    const amounts = hasBranch ? values.slice(1) : values;
-    const hasBalance = amounts.length >= 2;
-    const amount = hasBalance ? amounts[amounts.length - 2] : amounts[0];
+    // In BCA statements the four-digit CBG code sits immediately before the first formatted amount.
+    // Extract it from the text rather than treating numeric references as monetary values.
+    const firstAmountIndex = rest.search(amountPattern);
+    const branchMatch = firstAmountIndex >= 0 ? rest.slice(0, firstAmountIndex).match(/\b(\d{4})\s*$/) : null;
+    const branch = branchMatch?.[1] ?? '';
+    const amounts = values;
     const balance = amounts.length ? amounts[amounts.length - 1] : null;
-    const description = rest.replace(amountPattern, ' ').replace(/\b(DB|DEBIT|DR|CR|CREDIT|KREDIT)\b/ig, ' ').replace(/\s+/g, ' ').trim();
+    const description = rest.replace(amountPattern, ' ').replace(branch ? new RegExp(\`\\b\${branch}\\b\`) : /$^/, ' ').replace(/\b(DB|DEBIT|DR|CR|CREDIT|KREDIT)\b/ig, ' ').replace(/\s+/g, ' ').trim();
     return [{
       id: crypto.randomUUID(), date, description: description || 'Perlu diperiksa', branch,
       debit: !isOpening && direction === 'debit' ? amount : null,

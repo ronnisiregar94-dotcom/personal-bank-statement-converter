@@ -8,6 +8,20 @@ import { BANK_OPTIONS, detectBank, parseMoney, parseStatementText, validateBalan
 import { exportCSV, exportWorkbook } from './lib/export';
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
+type DocumentKind = 'pdf' | 'image';
+function getDocumentKind(file: File): DocumentKind | null {
+  const name = file.name.toLowerCase();
+  if (file.type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+  if (['image/jpeg', 'image/jpg', 'image/png'].includes(file.type) ||
+      /\.(jpe?g|png)$/i.test(name)) return 'image';
+  return null;
+}
+async function canvasToPng(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Gagal mengubah halaman PDF menjadi gambar.')), 'image/png');
+  });
+}
+
 const sample:Transaction[]=[
  {id:'1',date:'01/08/2025',description:'SALDO AWAL',branch:'',debit:null,credit:null,balance:1993702.46,confidence:'high'},
  {id:'2',date:'06/08/2025',description:'SWITCHING CR — TRANSFER DR 536 ASURANSI JIWA MANU /KPO BCA SYA',branch:'',debit:null,credit:4200026,balance:6193728.46,confidence:'review'},
@@ -22,8 +36,8 @@ export default function App(){
  const balance=useMemo(()=>validateBalance(parseMoney(opening)??0,rows,closing?parseMoney(closing)??undefined:undefined),[opening,rows,closing]);
  const update=(id:string,key:keyof Transaction,value:string)=>setRows(old=>old.map(r=>r.id===id?{...r,[key]:['debit','credit','balance'].includes(key)?(value===''?null:parseMoney(value)):value}:r));
  const processFiles=useCallback(async(list:FileList|null)=>{if(!list?.length)return;setBusy(true);setProgress(0);setStatus('Menyiapkan dokumen…');let all:Transaction[]=[];const names:string[]=[];
- try{for(let i=0;i<list.length;i++){const file=list[i];names.push(file.name);let images:Blob[]=[];
- if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf')){const data=new Uint8Array(await file.arrayBuffer());const pdf=await pdfjs.getDocument({data}).promise;for(let p=1;p<=pdf.numPages;p++){const page=await pdf.getPage(p);const viewport=page.getViewport({scale:2});const canvas=document.createElement('canvas');canvas.width=viewport.width;canvas.height=viewport.height;const ctx=canvas.getContext('2d');if(!ctx)continue;await page.render({canvasContext:ctx,viewport}).promise;images.push(await new Promise<Blob>(resolve=>canvas.toBlob(b=>resolve(b!), 'image/png')));}}
+ try{for(let i=0;i<list.length;i++){const file=list[i];const kind=getDocumentKind(file);if(!kind){setStatus(`Format tidak didukung: ${file.name}. Gunakan PDF, JPG/JPEG, atau PNG.`);continue;}names.push(file.name);let images:Blob[]=[];
+ if(kind==='pdf'){const data=new Uint8Array(await file.arrayBuffer());const pdf=await pdfjs.getDocument({data}).promise;for(let p=1;p<=pdf.numPages;p++){setStatus(`Merender PDF ${file.name} — halaman ${p}/${pdf.numPages}`);const page=await pdf.getPage(p);const viewport=page.getViewport({scale:2});const canvas=document.createElement('canvas');canvas.width=viewport.width;canvas.height=viewport.height;const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Browser tidak dapat membuat kanvas untuk membaca PDF.');await page.render({canvasContext:ctx,viewport}).promise;images.push(await canvasToPng(canvas));canvas.width=0;canvas.height=0;}}
  else images=[file];
  for(let j=0;j<images.length;j++){setStatus(`Membaca ${file.name} — halaman ${j+1}/${images.length}`);const enhanced=await enhanceForOCR(images[j]);let result=await Tesseract.recognize(enhanced,'ind+eng',{logger:m=>{if(m.status==='recognizing text')setProgress(Math.round(m.progress*100));}});if((result.data.confidence??0)<55){const fallback=await Tesseract.recognize(images[j],'ind+eng');if((fallback.data.confidence??0)>(result.data.confidence??0))result=fallback;}const detected=detectBank(result.data.text);if(detected)setBank(detected);all=all.concat(parseStatementText(result.data.text,detected??(bank as any)));setProgress(Math.round(((i+(j+1)/images.length)/list.length)*100));}}
  setFiles(old=>[...old,...names]);setRows(old=>[...old,...all]);setStatus(all.length?`Selesai membaca ${all.length} baris. Periksa kembali angka yang ditandai.`:'Tidak ada baris transaksi terdeteksi. Coba gambar lebih jelas atau masukkan manual.');
@@ -34,7 +48,7 @@ export default function App(){
  return <div className="app"><header className="topbar"><div className="brand"><div className="brandicon"><FileSpreadsheet size={23}/></div><div><b>Statement<span>Convert</span></b><small>PERSONAL BANK STATEMENT TOOL</small></div></div><div className="private"><ShieldCheck size={16}/> Diproses di perangkat</div></header>
  <main><section className="hero"><div className="eyebrow"><span/> KONVERSI REKENING KORAN</div><h1>Rekening koran,<br/><em>jadi Excel.</em></h1><p>Ubah foto, scan, atau PDF rekening koran menjadi tabel transaksi yang rapi. Periksa hasilnya, koreksi bila perlu, lalu unduh Excel.</p><div className="hero-pills"><span><ScanText size={15}/> OCR otomatis</span><span><FileSpreadsheet size={15}/> Excel siap edit</span><span><ShieldCheck size={15}/> Privat di browser</span></div></section>
  <section className="upload-card"><div className="section-heading"><div><div className="step">LANGKAH 01</div><h2>Unggah rekening koran</h2><p>Tambahkan gambar atau PDF. Banyak halaman dapat diproses sekaligus.</p></div><div className="fileicon"><FileImage/></div></div>
- <div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();void processFiles(e.dataTransfer.files);}}><div className="upload-symbol"><Upload size={24}/></div><b>Tarik file ke sini</b><span>atau pilih dari perangkat Anda</span><button className="primary" onClick={()=>inputRef.current?.click()} disabled={busy}><Plus size={17}/> Pilih file</button><small>JPG · JPEG · PNG · PDF</small><input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple hidden onChange={e=>void processFiles(e.target.files)}/></div>
+ <div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();void processFiles(e.dataTransfer.files);}}><div className="upload-symbol"><Upload size={24}/></div><b>Tarik file ke sini</b><span>atau pilih dari perangkat Anda</span><button className="primary" onClick={()=>inputRef.current?.click()} disabled={busy}><Plus size={17}/> Pilih file</button><small>PDF · JPG · JPEG · PNG</small><input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple hidden onChange={e=>void processFiles(e.target.files)}/></div>
  {busy&&<div className="progressbox"><div className="progressline"><span>{status}</span><b>{progress}%</b></div><div className="track"><div style={{width:progress+'%'}}/></div></div>}
  {files.length>0&&<div className="files"><b>Dokumen ditambahkan</b>{files.map((f,i)=><span key={i}><FileText size={14}/>{f}</span>)}</div>}
  <div className="privacy-note"><ShieldCheck size={16}/><span>OCR berjalan di browser Anda. File tidak diunggah ke server aplikasi. Hindari menggunakan perangkat bersama untuk dokumen sensitif.</span></div></section>

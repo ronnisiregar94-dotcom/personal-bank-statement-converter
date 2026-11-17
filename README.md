@@ -4,6 +4,9 @@ Aplikasi pribadi untuk mengubah rekening koran JPEG, PNG, dan PDF menjadi tabel 
 
 ## Fitur saat ini
 - Upload multi-file JPEG/PNG/PDF dan OCR di browser menggunakan Tesseract.js (bahasa Indonesia + Inggris).
+- Peningkatan praproses OCR: pembesaran gambar, grayscale, peningkatan kontras, dan OCR ulang pada gambar asli bila confidence hasil praproses rendah.
+- Deteksi header bank otomatis untuk BCA, BRI, BNI, Bank Mandiri, dan Bank Syariah Indonesia (BSI), dengan pilihan bank manual.
+- Parser umum untuk penanda DB/DR/DEBIT dan CR/CREDIT/KREDIT, beberapa kata arah transaksi Indonesia, format nominal Indonesia/internasional, serta tanggal dengan nama bulan.
 - Render PDF per halaman di browser.
 - Tabel transaksi yang bisa diedit: tanggal, keterangan, CBG, debit, kredit, saldo.
 - Ekspor XLSX dengan format kolom, filter, format angka, dan penanda baris yang perlu ditinjau.
@@ -26,7 +29,8 @@ npm test
 - Pemrosesan OCR dilakukan di browser; aplikasi ini tidak mengirim dokumen ke backend.
 - Jangan deploy sebagai layanan publik tanpa menambahkan autentikasi yang sesuai. Repository private disarankan untuk penggunaan pribadi.
 - OCR rekening koran dapat salah membaca angka, tanda desimal, tanggal, atau menggabungkan baris. Selalu verifikasi hasil terhadap sumber asli.
-- Deteksi transaksi saat ini heuristik dan belum merupakan parser tervalidasi untuk semua format bank. Kata DB/CR digunakan bila terbaca; baris tanpa penanda akan ditandai untuk peninjauan.
+- Dukungan multi-bank saat ini berupa deteksi identitas bank dari header dan parser transaksi umum. Template PDF, tata letak kolom, kode transaksi, dan istilah debit/kredit setiap bank belum divalidasi terhadap seluruh varian rekening koran. Baris tanpa arah transaksi yang jelas ditandai untuk peninjauan.
+- Pengujian otomatis menggunakan contoh teks sintetis, bukan sampel rekening koran resmi dari masing-masing bank. Sebelum dipakai untuk pekerjaan keuangan, uji dengan dokumen asli yang telah disamarkan dan cocokkan setiap transaksi dengan sumber.
 - Saldo akhir/rekonsiliasi bersifat pemeriksaan aritmetika, bukan jaminan bahwa setiap transaksi telah dibaca dengan benar.
 
 ## GitHub Pages / deployment

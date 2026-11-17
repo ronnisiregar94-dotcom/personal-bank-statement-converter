@@ -1,0 +1,1 @@
+export type Transaction = { id: string; date: string; description: string; branch: string; debit: number | null; credit: number | null; balance: number | null; confidence: 'high'|'review' };

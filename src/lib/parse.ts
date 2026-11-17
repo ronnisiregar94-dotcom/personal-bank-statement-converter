@@ -78,6 +78,49 @@ export function parseStatementText(text: string, _bank: BankCode = 'OTHER'): Tra
   });
 }
 
+
+export type StatementMetadata = {
+  bank: BankCode | null;
+  account: string;
+  period: string;
+  openingBalance: number | null;
+  closingBalance: number | null;
+};
+
+const MONTHS: Record<string, string> = {
+  JANUARI: 'Januari', JAN: 'Januari', FEBRUARI: 'Februari', FEB: 'Februari',
+  MARET: 'Maret', MAR: 'Maret', APRIL: 'April', APR: 'April',
+  MEI: 'Mei', JUNI: 'Juni', JUN: 'Juni', JULI: 'Juli', JUL: 'Juli',
+  AGUSTUS: 'Agustus', AGU: 'Agustus', AUGUST: 'Agustus', AUG: 'Agustus',
+  SEPTEMBER: 'September', SEP: 'September', OKTOBER: 'Oktober', OKT: 'Oktober', OCT: 'Oktober',
+  NOVEMBER: 'November', NOV: 'November', DESEMBER: 'Desember', DES: 'Desember', DECEMBER: 'Desember', DEC: 'Desember',
+};
+
+function normalizePeriod(raw: string): string {
+  const cleaned = raw.toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const match = cleaned.match(/\b(JANUARI|JAN|FEBRUARI|FEB|MARET|MAR|APRIL|APR|MEI|JUNI|JUN|JULI|JUL|AGUSTUS|AGU|AUGUST|AUG|SEPTEMBER|SEP|OKTOBER|OKT|OCT|NOVEMBER|NOV|DESEMBER|DES|DECEMBER|DEC)\s+(20\d{2})\b/);
+  return match ? MONTHS[match[1]] + ' ' + match[2] : '';
+}
+
+export function extractStatementMetadata(text: string, rows: Transaction[] = []): StatementMetadata {
+  const normalized = text.replace(/\r/g, '\n');
+  const accountMatch =
+    normalized.match(/(?:NO\.?\s*REKENING|NOMOR\s*REKENING|ACCOUNT\s*NUMBER|A\/C\s*NO\.?)\s*[:：]?\s*([0-9][0-9\s-]{5,24})/i);
+  const account = accountMatch?.[1]?.replace(/\D/g, '').slice(0, 20) ?? '';
+  const periodMatch = normalized.match(/(?:PERIODE|PERIOD|STATEMENT\s*PERIOD)\s*[:：]?\s*([A-ZÀ-ÿ0-9 ]{3,30})/i);
+  const period = periodMatch ? normalizePeriod(periodMatch[1]) : normalizePeriod(normalized);
+  const openingRow = rows.find(row => /SALDO\s+AWAL|OPENING\s+BALANCE/i.test(row.description));
+  const balances = rows.filter(row => row.balance !== null);
+  const closingBalance = balances.length ? balances[balances.length - 1].balance : null;
+  return {
+    bank: detectBank(normalized),
+    account,
+    period,
+    openingBalance: openingRow?.balance ?? null,
+    closingBalance,
+  };
+}
+
 export function validateBalance(opening: number, rows: Transaction[], closing?: number): { calculated: number; closing: number | null; difference: number | null; ok: boolean } {
   const calculated = rows.reduce((value, row) => value + (row.credit ?? 0) - (row.debit ?? 0), opening);
   const actual = closing ?? [...rows].reverse().find(row => row.balance !== null)?.balance ?? null;

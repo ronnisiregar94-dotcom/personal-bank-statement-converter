@@ -2,10 +2,11 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ArrowDownToLine, FileImage, FileSpreadsheet, FileText, Plus, ScanText, ShieldCheck, Trash2, Upload, WandSparkles, AlertTriangle, CheckCircle2, RotateCcw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import * as pdfjs from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { Transaction } from './types';
 import { parseMoney, parseStatementText, validateBalance, formatIDR } from './lib/parse';
 import { exportCSV, exportWorkbook } from './lib/export';
-pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const sample:Transaction[]=[
  {id:'1',date:'01/08/2025',description:'SALDO AWAL',branch:'',debit:null,credit:null,balance:1993702.46,confidence:'high'},

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ArrowDownToLine, FileImage, FileSpreadsheet, FileText, LoaderCircle, Plus, ScanText, ShieldCheck, Trash2, Upload, WandSparkles, AlertTriangle, CheckCircle2, RotateCcw } from 'lucide-react';
+import { ArrowDownToLine, FileImage, FileSpreadsheet, FileText, Plus, ScanText, ShieldCheck, Trash2, Upload, WandSparkles, AlertTriangle, CheckCircle2, RotateCcw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import * as pdfjs from 'pdfjs-dist';
 import type { Transaction } from './types';

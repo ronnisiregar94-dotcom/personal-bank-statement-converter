@@ -64,8 +64,10 @@ export function parseStatementText(text: string, _bank: BankCode = 'OTHER'): Tra
     const branchMatch = firstAmountIndex >= 0 ? rest.slice(0, firstAmountIndex).match(/\b(\d{4})\s*$/) : null;
     const branch = branchMatch?.[1] ?? '';
     const amounts = values;
+    const hasBalance = amounts.length >= 2;
+    const amount = hasBalance ? amounts[amounts.length - 2] : amounts[0];
     const balance = amounts.length ? amounts[amounts.length - 1] : null;
-    const description = rest.replace(amountPattern, ' ').replace(branch ? new RegExp(\`\\b\${branch}\\b\`) : /$^/, ' ').replace(/\b(DB|DEBIT|DR|CR|CREDIT|KREDIT)\b/ig, ' ').replace(/\s+/g, ' ').trim();
+    const description = rest.replace(amountPattern, ' ').replace(branch ? new RegExp('\\b' + branch + '\\b') : /$^/, ' ').replace(/\b(DB|DEBIT|DR|CR|CREDIT|KREDIT)\b/ig, ' ').replace(/\s+/g, ' ').trim();
     return [{
       id: crypto.randomUUID(), date, description: description || 'Perlu diperiksa', branch,
       debit: !isOpening && direction === 'debit' ? amount : null,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectBank, extractStatementMetadata, parseMoney, parseStatementText, validateBalance } from './parse';
+import { calculateRunningBalances, detectBank, extractStatementMetadata, parseMoney, parseStatementText, validateBalance } from './parse';
 
 describe('money parsing', () => {
   it('parses Indonesian and international separators', () => {
@@ -100,6 +100,32 @@ describe('bank detection and transaction parsing', () => {
       openingBalance: 1993702.46,
       closingBalance: 5693728.46,
     });
+  });
+
+
+  it('calculates missing transaction balances from the opening balance', () => {
+    const rows = parseStatementText([
+      '01/08 SALDO AWAL 1,993,702.46',
+      '06/08 TRANSFER CR 4,200,026.00',
+      '11/08 TARIKAN ATM 2,000,000.00 DB',
+      '14/08 TRANSFER CR 500,000.00',
+    ].join('\n'), 'BCA');
+    const calculated = calculateRunningBalances(rows, '');
+    expect(calculated.map(row => row.balance)).toEqual([
+      1993702.46, 6193728.46, 4193728.46, 4693728.46,
+    ]);
+  });
+
+  it('calculates from the opening balance field when no opening row was parsed', () => {
+    const rows = parseStatementText('06/08 TRANSFER CR 4,200,026.00\n11/08 TARIKAN ATM 2,000,000.00 DB');
+    const calculated = calculateRunningBalances(rows, '1.993.702,46');
+    expect(calculated.map(row => row.balance)).toEqual([6193728.46, 4193728.46]);
+  });
+
+  it('preserves printed balances as source values', () => {
+    const rows = parseStatementText('01/08 SALDO AWAL 1,000.00\n02/08 TRANSFER CR 200.00 1,200.00');
+    const calculated = calculateRunningBalances(rows, '');
+    expect(calculated[1].balance).toBe(1200);
   });
 
 });

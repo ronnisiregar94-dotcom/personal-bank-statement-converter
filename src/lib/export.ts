@@ -1,6 +1,5 @@
 import ExcelJS from 'exceljs';
 import type { Transaction } from '../types';
-import { formatIDR } from './parse';
 export async function exportWorkbook(rows:Transaction[], meta:{bank:string;account:string;period:string}) {
  const wb=new ExcelJS.Workbook(); wb.creator='Personal Statement Converter'; wb.created=new Date();
  const ws=wb.addWorksheet('Rekening Koran',{views:[{state:'frozen',ySplit:5}]});

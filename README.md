@@ -3,7 +3,9 @@
 Aplikasi pribadi untuk mengubah rekening koran JPEG, PNG, dan PDF menjadi tabel transaksi Excel/CSV. Aplikasi ini berdiri sendiri dan tidak terkait dengan proyek pemeriksaan LKPD.
 
 ## Fitur saat ini
-- Upload multi-file JPEG/PNG/PDF dan OCR di browser menggunakan Tesseract.js (bahasa Indonesia + Inggris).
+- Upload banyak file sekaligus dengan format PDF, JPG/JPEG, dan PNG; validasi format menggunakan ekstensi maupun MIME type agar tetap kompatibel dengan perangkat yang tidak mengisi MIME type.
+- PDF dirender halaman demi halaman menjadi gambar sebelum OCR; JPG/JPEG dan PNG langsung diproses oleh Tesseract.js (bahasa Indonesia + Inggris).
+- Format selain PDF, JPG/JPEG, dan PNG ditolak dengan pesan yang menjelaskan format yang didukung.
 - Peningkatan praproses OCR: pembesaran gambar, grayscale, peningkatan kontras, dan OCR ulang pada gambar asli bila confidence hasil praproses rendah.
 - Deteksi header bank otomatis untuk BCA, BRI, BNI, Bank Mandiri, dan Bank Syariah Indonesia (BSI), dengan pilihan bank manual.
 - Parser umum untuk penanda DB/DR/DEBIT dan CR/CREDIT/KREDIT, beberapa kata arah transaksi Indonesia, format nominal Indonesia/internasional, serta tanggal dengan nama bulan.

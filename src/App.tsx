@@ -3,7 +3,7 @@ import { ArrowDownToLine, FileImage, FileSpreadsheet, FileText, Plus, ScanText, 
 import Tesseract from 'tesseract.js';
 import * as pdfjs from 'pdfjs-dist';
 import type { Transaction } from './types';
-import { parseStatementText, validateBalance, formatIDR } from './lib/parse';
+import { parseMoney, parseStatementText, validateBalance, formatIDR } from './lib/parse';
 import { exportCSV, exportWorkbook } from './lib/export';
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
 
@@ -17,8 +17,8 @@ const sample:Transaction[]=[
 export default function App(){
  const [rows,setRows]=useState<Transaction[]>([]); const [files,setFiles]=useState<string[]>([]); const [busy,setBusy]=useState(false); const [progress,setProgress]=useState(0); const [status,setStatus]=useState(''); const [bank,setBank]=useState('BCA'); const [account,setAccount]=useState(''); const [period,setPeriod]=useState(''); const [opening,setOpening]=useState(''); const [closing,setClosing]=useState(''); const inputRef=useRef<HTMLInputElement>(null);
  const totals=useMemo(()=>({debit:rows.reduce((a,r)=>a+(r.debit??0),0),credit:rows.reduce((a,r)=>a+(r.credit??0),0)}),[rows]);
- const balance=useMemo(()=>validateBalance(Number(opening)||0,rows,closing?Number(closing):undefined),[opening,rows,closing]);
- const update=(id:string,key:keyof Transaction,value:string)=>setRows(old=>old.map(r=>r.id===id?{...r,[key]:['debit','credit','balance'].includes(key)?(value===''?null:Number(value)):value}:r));
+ const balance=useMemo(()=>validateBalance(parseMoney(opening)??0,rows,closing?parseMoney(closing)??undefined:undefined),[opening,rows,closing]);
+ const update=(id:string,key:keyof Transaction,value:string)=>setRows(old=>old.map(r=>r.id===id?{...r,[key]:['debit','credit','balance'].includes(key)?(value===''?null:parseMoney(value)):value}:r));
  const processFiles=useCallback(async(list:FileList|null)=>{if(!list?.length)return;setBusy(true);setProgress(0);setStatus('Menyiapkan dokumen…');let all:Transaction[]=[];const names:string[]=[];
  try{for(let i=0;i<list.length;i++){const file=list[i];names.push(file.name);let images:Blob[]=[];
  if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf')){const data=new Uint8Array(await file.arrayBuffer());const pdf=await pdfjs.getDocument({data}).promise;for(let p=1;p<=pdf.numPages;p++){const page=await pdf.getPage(p);const viewport=page.getViewport({scale:2});const canvas=document.createElement('canvas');canvas.width=viewport.width;canvas.height=viewport.height;const ctx=canvas.getContext('2d');if(!ctx)continue;await page.render({canvasContext:ctx,canvas,viewport}).promise;images.push(await new Promise<Blob>(resolve=>canvas.toBlob(b=>resolve(b!), 'image/png')));}}

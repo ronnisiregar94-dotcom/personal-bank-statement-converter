@@ -41,4 +41,20 @@ describe('bank detection and transaction parsing', () => {
     const rows = parseStatementText('06/08/2025 TRANSFER CR 100,00 1.100,00\n07/08/2025 TARIKAN DB 50,00 1.050,00');
     expect(validateBalance(1000, rows, 1050).ok).toBe(true);
   });
+
+  it('parses BCA-style US separators without mistaking references for amounts', () => {
+    const rows = parseStatementText([
+      '06/08/2025 TRSF E-BANKING CR 11/08/ACSY/0000100 25080500287215 8780 7,277,440.00 13,471,168.46',
+      '11/08/2025 TARIKAN ATM 11/08 2,000,000.00 DB',
+      '11/08/2025 TRSF E-BANKING DB 11/08/7ZEI/00000 11,500,000.00 DB 47,171,168.46',
+    ].join('\n'), 'BCA');
+    expect(rows).toHaveLength(3);
+    expect(rows[0].branch).toBe('8780');
+    expect(rows[0].credit).toBe(7277440);
+    expect(rows[0].balance).toBe(13471168.46);
+    expect(rows[1].debit).toBe(2000000);
+    expect(rows[1].balance).toBeNull();
+    expect(rows[2].debit).toBe(11500000);
+    expect(rows[2].balance).toBe(47171168.46);
+  });
 });

@@ -24,31 +24,41 @@ export function parseStatementText(text: string): Transaction[] {
     const dateMatch = line.match(/^(\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?)\s*(.*)$/);
     if (!dateMatch) return [];
     const [, date, rest] = dateMatch;
-    const amounts = [...rest.matchAll(amountPattern)];
-    if (!amounts.length) return [];
+    const matches = [...rest.matchAll(amountPattern)];
+    if (!matches.length) return [];
 
     const marker = /\b(DB|DEBIT|CR|CREDIT)\b/i.exec(rest)?.[1]?.toUpperCase();
-    const values = amounts.map(match => parseMoney(match[0]));
-    const hasBalance = values.length >= 2;
-    const transactionAmount = hasBalance ? values[values.length - 2] : values[0];
-    const balance = hasBalance ? values[values.length - 1] : null;
+    const tokens = matches.map(match => match[0]);
+    const values = tokens.map(parseMoney);
+    const isOpening = /\bSALDO\s+AWAL\b/i.test(rest);
+    const isDebit = marker === 'DB' || marker === 'DEBIT';
+    const isCredit = marker === 'CR' || marker === 'CREDIT';
+    const hasBranch = tokens.length >= 3 && /^\d{4}$/.test(tokens[0]);
+    const branch = hasBranch ? tokens[0] : '';
+    const monetaryValues = hasBranch ? values.slice(1) : values;
+    const hasBalance = monetaryValues.length >= 2;
+    const transactionAmount = hasBalance
+      ? monetaryValues[monetaryValues.length - 2]
+      : monetaryValues[0];
+    const balance = isOpening
+      ? monetaryValues[monetaryValues.length - 1]
+      : hasBalance ? monetaryValues[monetaryValues.length - 1] : null;
+
     const description = rest
       .replace(amountPattern, ' ')
       .replace(/\b(DB|DEBIT|CR|CREDIT)\b/ig, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const isDebit = marker === 'DB' || marker === 'DEBIT';
-    const isCredit = marker === 'CR' || marker === 'CREDIT';
 
     return [{
       id: crypto.randomUUID(),
       date,
       description: description || 'Perlu diperiksa',
-      branch: '',
-      debit: isDebit ? transactionAmount : null,
-      credit: isCredit ? transactionAmount : null,
+      branch,
+      debit: !isOpening && isDebit ? transactionAmount : null,
+      credit: !isOpening && isCredit ? transactionAmount : null,
       balance,
-      confidence: marker && hasBalance ? 'high' : 'review',
+      confidence: (isOpening || (marker && hasBalance)) ? 'high' : 'review',
     } satisfies Transaction];
   });
 }

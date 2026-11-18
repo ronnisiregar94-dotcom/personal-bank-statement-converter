@@ -72,6 +72,7 @@ export function parseStatementText(text: string, _bank: BankCode = 'OTHER'): Tra
       id: crypto.randomUUID(), date, description: description || 'Perlu diperiksa', branch,
       debit: !isOpening && direction === 'debit' ? amount : null,
       credit: !isOpening && direction === 'credit' ? amount : null,
+      amount: !isOpening && !direction ? amount : null,
       balance: isOpening || hasBalance ? balance : null,
       confidence: (isOpening || (direction && hasBalance)) ? 'high' : 'review',
     } satisfies Transaction];
@@ -122,13 +123,59 @@ export function extractStatementMetadata(text: string, rows: Transaction[] = [])
 }
 
 
+function inferUnmarkedDirections(rows: Transaction[], opening: number | null): Transaction[] {
+  const result = rows.map(row => ({ ...row }));
+  let previousBalance = opening;
+  let segmentStart = 0;
+  for (let anchor = 0; anchor < result.length; anchor++) {
+    if (result[anchor].balance === null) continue;
+    const segment = result.slice(segmentStart, anchor + 1);
+    const unknown = segment.map((row, offset) => ({ row, index: segmentStart + offset }))
+      .filter(item => item.row.amount != null && item.row.debit === null && item.row.credit === null);
+    if (previousBalance !== null && unknown.length) {
+      const knownDelta = segment.reduce((sum, row) => sum + (row.credit ?? 0) - (row.debit ?? 0), 0);
+      const target = Math.round((result[anchor].balance! - previousBalance - knownDelta) * 100);
+      const cents = unknown.map(item => Math.round((item.row.amount ?? 0) * 100));
+      const total = cents.reduce((sum, value) => sum + value, 0);
+      const requiredCredits = (target + total) / 2;
+      if (Number.isInteger(requiredCredits) && requiredCredits >= 0 && requiredCredits <= total) {
+        let states = new Map<number, number[][]>([[0, [[]]]]);
+        for (let i = 0; i < cents.length; i++) {
+          const next = new Map<number, number[][]>();
+          for (const [sum, paths] of states) for (const path of paths) {
+            const a = next.get(sum) ?? [];
+            if (a.length < 2) a.push(path);
+            next.set(sum, a);
+            const b = next.get(sum + cents[i]) ?? [];
+            if (b.length < 2) b.push([...path, i]);
+            next.set(sum + cents[i], b);
+          }
+          states = next;
+        }
+        const solutions = states.get(requiredCredits) ?? [];
+        if (solutions.length === 1) {
+          const credits = new Set(solutions[0]);
+          unknown.forEach((item, index) => {
+            const amount = item.row.amount ?? 0;
+            result[item.index] = { ...item.row, debit: credits.has(index) ? null : amount, credit: credits.has(index) ? amount : null };
+          });
+        }
+      }
+    }
+    previousBalance = result[anchor].balance;
+    segmentStart = anchor + 1;
+  }
+  return result;
+}
+
 export function calculateRunningBalances(rows: Transaction[], openingInput: string | number | null): Transaction[] {
   const opening = typeof openingInput === 'number'
     ? openingInput
     : openingInput === null || openingInput.trim() === '' ? null : parseMoney(openingInput);
+  const inferredRows = inferUnmarkedDirections(rows, opening);
   let running = opening;
-  return rows.map(row => {
-    const isOpening = /SALDO\s+AWAL|OPENING\s+BALANCE/i.test(row.description);
+  return inferredRows.map(row => {
+    const isOpening = /\b(SALDO\s+AWAL|OPENING\s+BALANCE)\b/i.test(row.description);
     if (isOpening) {
       if (row.balance !== null) running = row.balance;
       else if (running !== null) return { ...row, balance: running };
@@ -141,8 +188,6 @@ export function calculateRunningBalances(rows: Transaction[], openingInput: stri
           running = calculated;
           return { ...row, balance: calculated };
         }
-        // Keep the statement's printed balance as source evidence; use it as the
-        // starting point for the next row even when it differs from the calculation.
         running = row.balance;
         return row;
       }

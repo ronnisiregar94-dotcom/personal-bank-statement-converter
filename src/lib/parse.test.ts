@@ -103,6 +103,56 @@ describe('bank detection and transaction parsing', () => {
   });
 
 
+  it('infers unmarked BCA automatic-transfer directions from the next printed balance', () => {
+    const rows = parseStatementText([
+      '01/08 SALDO AWAL 1,993,702.46',
+      '06/08 TRANSFER CR 4,200,026.00 6,193,728.46',
+      '11/08 TARIKAN ATM 2,000,000.00 DB 4,193,728.46',
+      '14/08 KRO OTOMATIS LLG-CITIBANK PT A.J. MANULIFE 500,000.00',
+      '14/08 KRO OTOMATIS LLG-CITIBANK PT A.J. MANULIFE 500,000.00 5,193,728.46',
+    ].join('\n'), 'BCA');
+    const calculated = calculateRunningBalances(rows, '');
+    expect(calculated[3].credit).toBe(500000);
+    expect(calculated[4].credit).toBe(500000);
+    expect(calculated[3].debit).toBeNull();
+    expect(calculated[4].balance).toBe(5193728.46);
+  });
+
+  it('preserves unclassified amounts when balance evidence is insufficient', () => {
+    const rows = parseStatementText('14/08 KRO OTOMATIS PT A.J. MANULIFE 500,000.00', 'BCA');
+    const calculated = calculateRunningBalances(rows, '');
+    expect(calculated[0].amount).toBe(500000);
+    expect(calculated[0].debit).toBeNull();
+    expect(calculated[0].credit).toBeNull();
+    expect(calculated[0].confidence).toBe('review');
+  });
+
+  it('infers the unmarked KRO movements in the supplied BCA statement sequence', () => {
+    const rows = parseStatementText([
+      '01/08 SALDO AWAL 1,993,702.46',
+      '06/08 SWITCHING CR 4,200,026.00 6,193,728.46',
+      '06/08 TRSF E-BANKING CR 7,277,440.00 13,471,168.46',
+      '11/08 TARIKAN ATM 2,000,000.00 DB',
+      '11/08 TRSF E-BANKING DB 11,000,000.00 DB 471,168.46',
+      '14/08 KRO OTOMATIS LLG-CITIBANK PT A.J. MANULIFE 500,000.00',
+      '14/08 KRO OTOMATIS LLG-CITIBANK PT A.J. MANULIFE 500,000.00 1,471,168.46',
+      '15/08 KRO OTOMATIS LLG-CITIBANK PT A.J. MANULIFE 730,000.00',
+      '15/08 KRO OTOMATIS LLG-CITIBANK PT A.J. MANULIFE 500,000.00',
+      '15/08 BIAYA ADM 16,000.00 DB 2,685,168.46',
+      '15/08 BI-FAST CR 500,000.00 3,185,168.46',
+      '20/08 SWITCHING CR 3,358,535.00',
+      '20/08 TRSF E-BANKING CR 10,167,774.00 16,711,477.46',
+    ].join('\n'), 'BCA');
+    const calculated = calculateRunningBalances(rows, '');
+    expect(calculated[5].credit).toBe(500000);
+    expect(calculated[6].credit).toBe(500000);
+    expect(calculated[7].credit).toBe(730000);
+    expect(calculated[8].credit).toBe(500000);
+    expect(calculated[11].credit).toBe(3358535);
+    expect(calculated[12].credit).toBe(10167774);
+    expect(calculated[12].balance).toBe(16711477.46);
+  });
+
   it('calculates missing transaction balances from the opening balance', () => {
     const rows = parseStatementText([
       '01/08 SALDO AWAL 1,993,702.46',

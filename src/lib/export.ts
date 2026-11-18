@@ -7,7 +7,7 @@ export async function exportWorkbook(rows:Transaction[], meta:{bank:string;accou
  ws.addRow(['Bank',meta.bank,'','','Nomor rekening',meta.account,'']); ws.addRow(['Periode',meta.period]); ws.addRow([]);
  const header=ws.addRow(['No','Tanggal','Keterangan','CBG','Debit (Rp)','Kredit (Rp)','Mutasi belum terklasifikasi (Rp)','Saldo (Rp)']); header.font={bold:true,color:{argb:'FFFFFFFF'}}; header.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF164E43'}};
  rows.forEach((r,i)=>{const row=ws.addRow([i+1,r.date,r.description,r.branch,r.debit,r.credit,r.amount??null,r.balance]); row.getCell(5).numFmt='#,##0.00'; row.getCell(6).numFmt='#,##0.00'; row.getCell(7).numFmt='#,##0.00'; row.getCell(8).numFmt='#,##0.00'; if(r.confidence==='review') row.eachCell(c=>{c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF2CC'}};});});
- ws.columns=[{width:7},{width:16},{width:52},{width:12},{width:20},{width:28},{width:20}]; ws.autoFilter={from:'A5',to:`H${rows.length+5}`};
+ ws.columns=[{width:7},{width:16},{width:52},{width:12},{width:20},{width:20},{width:28},{width:20}]; ws.autoFilter={from:'A5',to:`H${rows.length+5}`};
  ws.addRow([]); const totals=ws.addRow(['','','TOTAL','',{formula:`SUM(E6:E${rows.length+5})`},{formula:`SUM(F6:F${rows.length+5})`},'']); totals.font={bold:true}; totals.getCell(5).numFmt='#,##0.00';totals.getCell(6).numFmt='#,##0.00';
  const bytes=await wb.xlsx.writeBuffer(); const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='rekening-koran.xlsx'; a.click(); URL.revokeObjectURL(url);
 }

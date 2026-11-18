@@ -175,7 +175,7 @@ export function calculateRunningBalances(rows: Transaction[], openingInput: stri
   const inferredRows = inferUnmarkedDirections(rows, opening);
   let running = opening;
   return inferredRows.map(row => {
-    const isOpening = /\\b(SALDO\\s+AWAL|OPENING\\s+BALANCE)\\b/i.test(row.description);
+    const isOpening = /\b(SALDO\s+AWAL|OPENING\s+BALANCE)\b/i.test(row.description);
     if (isOpening) {
       if (row.balance !== null) running = row.balance;
       else if (running !== null) return { ...row, balance: running };

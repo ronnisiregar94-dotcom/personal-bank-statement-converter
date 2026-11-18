@@ -110,7 +110,7 @@ describe('bank detection and transaction parsing', () => {
       '11/08 TARIKAN ATM 2,000,000.00 DB 4,193,728.46',
       '14/08 KRO OTOMATIS LLG-CITIBANK PT A.J. MANULIFE 500,000.00',
       '14/08 KRO OTOMATIS LLG-CITIBANK PT A.J. MANULIFE 500,000.00 5,193,728.46',
-    ].join('\\n'), 'BCA');
+    ].join('\n'), 'BCA');
     const calculated = calculateRunningBalances(rows, '');
     expect(calculated[3].credit).toBe(500000);
     expect(calculated[4].credit).toBe(500000);

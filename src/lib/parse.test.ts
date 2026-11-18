@@ -103,6 +103,21 @@ describe('bank detection and transaction parsing', () => {
   });
 
 
+  it('infers unmarked BCA automatic-transfer directions from the next printed balance', () => {
+    const rows = parseStatementText([
+      '01/08 SALDO AWAL 1,993,702.46',
+      '06/08 TRANSFER CR 4,200,026.00 6,193,728.46',
+      '11/08 TARIKAN ATM 2,000,000.00 DB 4,193,728.46',
+      '14/08 KRO OTOMATIS LLG-CITIBANK PT A.J. MANULIFE 500,000.00',
+      '14/08 KRO OTOMATIS LLG-CITIBANK PT A.J. MANULIFE 500,000.00 5,193,728.46',
+    ].join('\\n'), 'BCA');
+    const calculated = calculateRunningBalances(rows, '');
+    expect(calculated[3].credit).toBe(500000);
+    expect(calculated[4].credit).toBe(500000);
+    expect(calculated[3].debit).toBeNull();
+    expect(calculated[4].balance).toBe(5193728.46);
+  });
+
   it('calculates missing transaction balances from the opening balance', () => {
     const rows = parseStatementText([
       '01/08 SALDO AWAL 1,993,702.46',
